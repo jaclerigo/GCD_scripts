@@ -1018,6 +1018,105 @@
 				let $roleCameo       = [];
 				let $rolenone        = [];
 
+				function buildRoleActions() {
+					return "<span class='set_role' data-value='3'>F</span>-<span class='set_role' data-value='5'>S</span>-<span class='set_role' data-value='1'>A</span>-<span class='set_role' data-value='6'>V</span>-<span class='set_role' data-value='4'>G</span>-<span class='set_role' data-value='2'>C</span>-<span class='set_role' data-value='' title='Limpar role'>X</span>";
+				}
+
+				function normalizeAnchor(text) {
+					return String(text || '').trim().replace(/\s+/g, '-').replace("'", '-').replace(",", '-').replace(".", '-').replace(/"/g, '');
+				}
+
+				function listCharacters(item, marginLeft, prefix) {
+					let $personagem  = item;
+					let $goto_anchor = normalizeAnchor($personagem);
+					let $margin      = marginLeft || 0;
+					let $prefix      = prefix ? "<span class='jac-tree-prefix'>" + prefix + "</span> " : "";
+
+					$("#mycharacterslist").append("<span style='margin-left:" + $margin + "px'>" + $prefix + buildRoleActions() + " | <span class='characterAnchor' style='cursor:pointer' data-goto-anchor='" + $goto_anchor + "'>" + $personagem + "</span></span><br>");
+				}
+
+				function displayCharactersByRole(roleArray, roleTitle, isFirst) {
+					let groupMap        = {};
+					let ungroupedChars  = [];
+
+					if (!isFirst) {
+						$("#mycharacterslist").append("<br>");
+					}
+
+					$("#mycharacterslist").append("<span style='font-weight:bold'>" + roleTitle + "</span><br>");
+
+					roleArray.forEach(function (characterID) {
+						let $personagem = $charactersInSeq[characterID][1][1];
+						let $group      = $charactersInSeq[characterID][7][1];
+
+						if ($group && $group !== '') {
+							if (!groupMap[$group]) {
+								groupMap[$group] = [];
+							}
+
+							groupMap[$group].push($personagem);
+						}
+						else {
+							ungroupedChars.push($personagem);
+						}
+					});
+
+					Object.keys(groupMap).sort().forEach(function (groupName) {
+						let $groupCharacters = groupMap[groupName].sort();
+
+						$("#mycharacterslist").append("<span style='margin-left:20px; font-weight:bold'>" + groupName + ":</span><br>");
+
+						$groupCharacters.forEach(function (personagem, index) {
+							let $treePrefix = index === $groupCharacters.length - 1 ? "└" : "├";
+							listCharacters(personagem, 40, $treePrefix);
+						});
+					});
+
+					ungroupedChars.sort().forEach(function (personagem) {
+						listCharacters(personagem, 20);
+					});
+				}
+
+				function getRoleSelectByAnchor(anchorName) {
+					let $anchorElement = $('.select2-selection__rendered[myanchor=' + anchorName + ']');
+
+					if (!$anchorElement.length) {
+						return $();
+					}
+
+					let $elementId = $anchorElement.attr('id');
+					if (!$elementId) {
+						return $();
+					}
+
+					let match       = $elementId.match(/select2-id_story_character_revisions-(\d+)-character-container/);
+					let characterID = match ? match[1] : null;
+
+					if (characterID === null) {
+						return $();
+					}
+
+					return $("#id_story_character_revisions-" + characterID + "-role");
+				}
+
+				function setRoleValue($roleSelect, roleValue) {
+					if (!$roleSelect.length) {
+						return;
+					}
+
+					let normalizedValue = typeof roleValue === "undefined" ? "" : String(roleValue);
+
+					if (normalizedValue === "") {
+						$roleSelect.prop("selectedIndex", 0);
+						$roleSelect.val("");
+					}
+					else {
+						$roleSelect.val(normalizedValue);
+					}
+
+					$roleSelect.trigger('change');
+				}
+
 				$('.select2-selection__rendered').each(function (e) {
 					let $characterRendered = $(this).attr('title');
 					let $idCharacter       = $(this).attr('id');
@@ -1112,87 +1211,35 @@
 								let $aOG    = ['Origin', $flashback];
 								let $aDT    = ['Death', $flashback];
 								let $aNotes = ['Notes', $("#id_story_character_revisions-" + $ID + "-notes").val()];
+								let $groupText = $("#id_story_character_revisions-" + $ID + "-group_name option:selected").first().text().trim();
+								let $groupName = "";
 
-								$charactersInSeq[$ID] = ['Personagem', $aName, $aRole, $aFB, $aOG, $aDT, $aNotes];
+								if ($groupText !== "") {
+									let $groupParts = $groupText.split(" - ");
+									$groupName      = ($groupParts.length > 1 ? $groupParts[$groupParts.length - 1] : $groupText).trim();
+								}
+
+								let $aGroup = ['Group', $groupName];
+
+								$charactersInSeq[$ID] = ['Personagem', $aName, $aRole, $aFB, $aOG, $aDT, $aNotes, $aGroup];
 							}
 
-							$(this).attr("myanchor", $personagemF['0'].trim().replace(/\s+/g, '-').replace("'", '-').replace(".", '-').replace(",", '-').replace(/"/g, ''));
+							$(this).attr("myanchor", normalizeAnchor($personagemF['0'].trim()));
 						}
 					}
 				});
 				console.log("ARRAY", $charactersInSeq);
 
-				let $sorter      = [];
-				let $iconSection = [];
-				$("#mycharacterslist").append("<span style='font-weight:bold'>Featured</span><br>");
-				$roleFeatured.forEach(listRoles);
-				let $arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
+				displayCharactersByRole($roleFeatured, "Featured", true);
+				displayCharactersByRole($roleSupporting, "Supporting", false);
+				displayCharactersByRole($roleAntoganist, "Antagonist", false);
+				displayCharactersByRole($roleVillain, "Villain", false);
+				displayCharactersByRole($roleGuest, "Guest", false);
+				displayCharactersByRole($roleCameo, "Cameo", false);
+				displayCharactersByRole($rolenone, "none", false);
 
-				$sorter = [];
-				$("#mycharacterslist").append("<br><span style='font-weight:bold'>Supporting</span><br>");
-				$roleSupporting.forEach(listRoles);
-				$arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
-
-				$sorter = [];
-				$("#mycharacterslist").append("<br><span style='font-weight:bold'>Antoganist</span><br>");
-				$roleAntoganist.forEach(listRoles);
-				$arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
-
-				$sorter = [];
-				$("#mycharacterslist").append("<br><span style='font-weight:bold'>Villain</span><br>");
-				$roleVillain.forEach(listRoles);
-				$arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
-
-				$sorter = [];
-				$("#mycharacterslist").append("<br><span style='font-weight:bold'>Guest</span><br>");
-				$roleGuest.forEach(listRoles);
-				$arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
-
-				$sorter = [];
-				$("#mycharacterslist").append("<br><span style='font-weight:bold'>Cameo</span><br>");
-				$roleCameo.forEach(listRoles);
-				$arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
-
-				$sorter = [];
-				$("#mycharacterslist").append("<br><span style='font-weight:bold'>none</span><br>");
-				$rolenone.forEach(listRoles);
-				console.log("$rolenone", $rolenone);
-				$arrayPersonagens = $sorter.sort();
-				$arrayPersonagens.forEach(listCharacters);
-
-				function listRoles(item, index) {
-					let $personagem = $charactersInSeq[item][1][1];
-					//let $FB = $charactersInSeq[item][3][1] == true ? '<i class="fa-duotone fa-clock-rotate-left"></i>' : '<i class="fa-thin fa-clock-rotate-left"></i>';
-					//let $OG = $charactersInSeq[item][4][1] == true ? '<i class="fa-solid fa-star"></i>' : '<i class="fa-thin fa-star"></i>';
-					//let $DT = $charactersInSeq[item][5][1] == true ? '<i class="fa-duotone fa-skull"></i>' : '<i class="fa-thin fa-skull"></i>';
-					//$iconSection = $FB + " " + $OG + " " + $DT;
-					$sorter.push($personagem);
-				}
-
-				function listCharacters(item, index) {
-					let $personagem  = item;
-					let $goto_anchor = $personagem.replace(/\s+/g, '-').replace("'", '-').replace(",", '-').replace(".", '-').replace(/"/g, '');
-					$("#mycharacterslist").append("<span class='set_role' data-value='3'>F</span>-<span class='set_role' data-value='5'>S</span>-<span" + " class='set_role' data-value='1'>A</span>-<span class='set_role' data-value='6'>V</span>-<span class='set_role'" + " data-value='4'>G</span>-<span class='set_role' data-value='2'>C</span> | <span class='characterAnchor'" + " style='cursor:pointer' goto_anchor='" + $goto_anchor + "'>" + $personagem + "</span><br>");
-				}
-
-				//$charactersInSeq.forEach(listCharacters);
-				//function listCharacters(item, index){
-				/*
-				let $item = item.replace(/\s+/g, '-').replace("'", '-');
-				$("#mycharacterslist").append("<span class='characterAnchor' style='cursor:pointer' goto_anchor='"+$item+"'>" + item + "</span><br>");
-				*/
-				//console.log("IC: ", item);
-				//}
-
-				$(".characterAnchor").on("click", function () {
-					let $goTo = $(this).attr("goto_anchor");
-					$goTo.replace(/\s+/g, '-').replace("'", '-').replace(",", '-').replace(".", '-').replace(/"/g, '');
+				$(document).off("click.jacCharacterAnchor", ".characterAnchor").on("click.jacCharacterAnchor", ".characterAnchor", function () {
+					let $goTo = normalizeAnchor($(this).attr("data-goto-anchor"));
 					$('html, body').animate({
 						scrollTop: $('.select2-selection__rendered[myanchor=' + $goTo + ']').offset().top - 50
 					}, 'slow');
@@ -1200,23 +1247,16 @@
 
 				$(".set_role").css("cursor", "pointer");
 
-				$(document).on("click", ".set_role", function () {
-					let $roleValue = $(this).data("value");
-					let $goTo      = $(this).nextAll(".characterAnchor").attr("goto_anchor");
+				$(document).off("click.jacSetRole", ".set_role").on("click.jacSetRole", ".set_role", function () {
+					let $roleValue = $(this).attr("data-value");
+					let $goTo      = normalizeAnchor($(this).nextAll(".characterAnchor").attr("data-goto-anchor"));
 					console.log("$goTo", $goTo);
-					$goTo = $goTo.replace(/\s+/g, '-').replace("'", '-').replace(",", '-').replace(".", '-').replace(/"/g, '');
 
 					$('html, body').animate({
 						scrollTop: $('.select2-selection__rendered[myanchor=' + $goTo + ']').offset().top - 50
 					}, 'slow', function () {
-						let $elementId = $('.select2-selection__rendered[myanchor=' + $goTo + ']').attr('id');
-						console.log("$elementId", $elementId);
-
-						let match       = $elementId.match(/select2-id_story_character_revisions-(\d+)-character-container/);
-						let characterID = match ? match[1] : null;
-						console.log("characterID", characterID);
-
-						$("#id_story_character_revisions-" + characterID + "-role").val($roleValue);
+						let $roleSelect = getRoleSelectByAnchor($goTo);
+						setRoleValue($roleSelect, $roleValue);
 					});
 				});
 
@@ -1345,6 +1385,216 @@
 		addGlobalStyle('.btn_delete { text-align: left; background-color: red; color: white; width: 125px;}');
 		addGlobalStyle('table.border tr:nth-child(even) { background-color: #f2f2f2; }');
 		addGlobalStyle('.jac-discard-retract-pair { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .jac-discard-retract-pair .btn-queue-action { display: inline-flex !important; width: auto !important; align-items: center; justify-content: center; } .jac-discard-retract-pair button { display: inline-flex; align-items: center; gap: 4px; }');
+		addGlobalStyle('.jac-markdown-field { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; } .jac-markdown-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 4px 0; } .jac-markdown-toolbar .btn-blue-editing { display: inline-flex; align-items: center; justify-content: center; margin: 0; } .jac-markdown-toolbar button { cursor: pointer; } .jac-markdown-toolbar i { pointer-events: none; }');
+
+		initializeMarkdownToolbar();
+
+		function initializeMarkdownToolbar() {
+			let $targets = getMarkdownToolbarTargets();
+
+			if (!$targets.length) {
+				return;
+			}
+
+			$targets.each(function () {
+				let $textarea   = $(this);
+				let targetName  = $textarea.attr("name") || $textarea.attr("id") || "markdown";
+				let $wrapper    = getMarkdownFieldWrapper($textarea);
+				let $hasToolbar = $wrapper.children(".jac-markdown-toolbar[data-target-name='" + targetName + "']");
+
+				if (!$hasToolbar.length) {
+					$wrapper.prepend(createMarkdownToolbar().attr("data-target-name", targetName));
+				}
+			});
+
+			$(document).off("click.jacMarkdownBold", ".jac-markdown-bold").on("click.jacMarkdownBold", ".jac-markdown-bold", function (e) {
+				e.preventDefault();
+				applyMarkdownWrap(getMarkdownTextareaFromToolbarButton($(this)), "**", "**");
+			});
+
+			$(document).off("click.jacMarkdownItalic", ".jac-markdown-italic").on("click.jacMarkdownItalic", ".jac-markdown-italic", function (e) {
+				e.preventDefault();
+				applyMarkdownWrap(getMarkdownTextareaFromToolbarButton($(this)), "*", "*");
+			});
+
+			$(document).off("click.jacMarkdownSearch", ".jac-markdown-search").on("click.jacMarkdownSearch", ".jac-markdown-search", function (e) {
+				e.preventDefault();
+				let $textarea = getMarkdownTextareaFromToolbarButton($(this));
+				let selected  = getTextareaSelection($textarea).trim();
+
+				if (selected === "") {
+					return;
+				}
+
+				window.open(origin + "/searchNew/?q=" + encodeURIComponent(selected), "_blank");
+			});
+
+			$(document).off("click.jacMarkdownPasteLink", ".jac-markdown-paste-link").on("click.jacMarkdownPasteLink", ".jac-markdown-paste-link", async function (e) {
+				e.preventDefault();
+
+				let $textarea    = getMarkdownTextareaFromToolbarButton($(this));
+				let selectedText = getTextareaSelection($textarea);
+
+				if (selectedText.trim() === "") {
+					return;
+				}
+
+				if (!navigator.clipboard || typeof navigator.clipboard.readText !== "function") {
+					alert("Clipboard API indisponível neste contexto.");
+					return;
+				}
+
+				try {
+					let clipboardText = await navigator.clipboard.readText();
+					let referenceData = parseMarkdownReference(clipboardText);
+
+					if (!referenceData) {
+						alert("Clipboard não contém referência válida.");
+						return;
+					}
+
+					insertMarkdownReference($textarea, selectedText, referenceData);
+				}
+				catch (error) {
+					console.error("Erro ao ler clipboard para markdown:", error);
+					alert("Erro ao ler clipboard.");
+				}
+			});
+		}
+
+		function getMarkdownToolbarTargets() {
+			let selectors = [];
+
+			if (routeMatch(/^\/changeset\/\d+\/edit\/$/)) {
+				selectors.push("textarea[name='description']", "textarea[name='notes']");
+			}
+
+			if (routeIs('/character/add/')) {
+				selectors.push("textarea[name='description']");
+			}
+
+			if (!selectors.length) {
+				return $();
+			}
+
+			return $(selectors.join(", ")).filter(function () {
+				return $(this).length && !$(this).prop("disabled");
+			});
+		}
+
+		function getMarkdownFieldWrapper($textarea) {
+			let $field = $textarea.closest(".markdownx");
+
+			if (!$field.length) {
+				$field = $textarea;
+			}
+
+			if (!$field.parent().hasClass("jac-markdown-field")) {
+				$field.wrap("<div class='jac-markdown-field'></div>");
+			}
+
+			return $field.parent();
+		}
+
+		function createMarkdownToolbar() {
+			return $(
+				"<div class='jac-markdown-toolbar'>" +
+				"<button type='button' class='btn-blue-editing jac-markdown-bold' title='Bold' aria-label='Bold'><i class='fa-duotone fa-bold'></i></button>" +
+				"<button type='button' class='btn-blue-editing jac-markdown-italic' title='Italic' aria-label='Italic'><i class='fa-duotone fa-italic'></i></button>" +
+				"<button type='button' class='btn-blue-editing jac-markdown-search' title='Search' aria-label='Search'><i class='fa-duotone fa-search'></i></button>" +
+				"<button type='button' class='btn-blue-editing jac-markdown-paste-link' title='Paste Link' aria-label='Paste Link'><i class='fa-duotone fa-link'></i></button>" +
+				"</div>"
+			);
+		}
+
+		function getMarkdownTextareaFromToolbarButton($button) {
+			return $button.closest(".jac-markdown-field").find("textarea").first();
+		}
+
+		function getTextareaSelection($textarea) {
+			let textarea = $textarea.get(0);
+
+			if (!textarea) {
+				return "";
+			}
+
+			return (textarea.value || "").substring(textarea.selectionStart || 0, textarea.selectionEnd || 0);
+		}
+
+		function applyMarkdownWrap($textarea, prefix, suffix) {
+			let textarea = $textarea.get(0);
+
+			if (!textarea) {
+				return;
+			}
+
+			let value     = $textarea.val() || "";
+			let start     = textarea.selectionStart || 0;
+			let end       = textarea.selectionEnd || 0;
+			let selected  = value.substring(start, end);
+			let inserted  = prefix + selected + suffix;
+			let newValue  = value.substring(0, start) + inserted + value.substring(end);
+			let rangeFrom = start + prefix.length;
+			let rangeTo   = rangeFrom + selected.length;
+
+			$textarea.val(newValue).trigger("input").trigger("change");
+			textarea.focus();
+
+			if (selected === "") {
+				textarea.setSelectionRange(rangeFrom, rangeFrom);
+			}
+			else {
+				textarea.setSelectionRange(rangeFrom, rangeTo);
+			}
+		}
+
+		function parseMarkdownReference(text) {
+			let clipboardText = String(text || "").trim();
+
+			if (clipboardText === "") {
+				return null;
+			}
+
+			let definitionMatch = clipboardText.match(/^\[(\d+)]:\s*(\S+)$/m);
+
+			if (!definitionMatch) {
+				return null;
+			}
+
+			let referenceId  = definitionMatch[1];
+			let referenceUrl = definitionMatch[2];
+			let referenceDef = "[" + referenceId + "]: " + referenceUrl;
+
+			return {
+				id  : referenceId,
+				url : referenceUrl,
+				line: referenceDef
+			};
+		}
+
+		function insertMarkdownReference($textarea, selectedText, referenceData) {
+			let textarea = $textarea.get(0);
+
+			if (!textarea) {
+				return;
+			}
+
+			let value        = $textarea.val() || "";
+			let start        = textarea.selectionStart || 0;
+			let end          = textarea.selectionEnd || 0;
+			let cleanSelection = selectedText.trim();
+			let replacement  = "[" + cleanSelection + "][" + referenceData.id + "]";
+			let updatedValue = value.substring(0, start) + replacement + value.substring(end);
+
+			if (updatedValue.indexOf(referenceData.line) === -1) {
+				updatedValue = updatedValue.replace(/\s*$/, "");
+				updatedValue += (updatedValue === "" ? "" : "\n\n") + referenceData.line;
+			}
+
+			$textarea.val(updatedValue).trigger("input").trigger("change");
+			textarea.focus();
+			textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+		}
 
 		function replaceInput2Button(value, fontawesome) {
 			let element = $("input[value='" + value + "']");
